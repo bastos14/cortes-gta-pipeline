@@ -29,4 +29,17 @@ picos:
   pesos_sem_chat:  {audio: 0.45, texto: 0.55}
   palavras_gatilho:       # reações típicas (peso 1 = normal, 2 = forte)
     2: [caralho, "meu deus", "não acredito", socorro, "que isso", "o que é isso", "não pode ser", "pelo amor", "que absurdo", "morri", "kkkk", "haha", rsrs]
-    1: [mano, nossa, olha, "ai não", "ferrou", "fui preso", "polícia", "perseguição", "tiro", "morreu", "roubo", "assalto", "bateu", "explodiu", "gente", "eita", "uau", "aí sim", "ganhei", "perdi", "mentira", "sério"]
+    0.5: [mano, nossa, olha, gente, uau, eita, sério]
+    1: ["ai não", "ferrou", "fui preso", "polícia", "perseguição", "tiro", "morreu", "roubo", "assalto", "bateu", "explodiu", "aí sim", "ganhei", "perdi", "mentira"]
+edicao:                   # Fase 3 (layout 9:16: streamer em cima, jogo embaixo)
+  largura: 1080
+  altura: 1920
+  topo_altura: 768        # px da área da câmera (40%); o resto (1152) é o jogo
+  whisper_modelo_legenda: medium
+  legenda_palavras_por_bloco: 3
+  legenda_cor_destaque: "00FFFF"   # amarelo (BGR no ASS)
+  legenda_margem_inferior: 420     # px do rodapé (zona livre da interface do TikTok/Shorts)
+  marca_dagua_y: 170               # px do topo; texto kick.com/allanstag, o corte todo
+  frase_max_palavras: 8
+  fonte: "DejaVu Sans"
+  crf: 20
