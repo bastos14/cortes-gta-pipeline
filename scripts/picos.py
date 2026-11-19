@@ -108,12 +108,11 @@ def motivo(i, s_audio, s_texto, s_chat, det, tem_chat, estouro_db):
 def seleciona(ini, nota, s_audio, s_texto, s_chat, detalhe, tem_chat, estouro, offset, cfg, segmentos, dur):
     jan, top = cfg["janela_s"], cfg["top_n"]
     ordem = np.argsort(-nota)
-    escolhidos, res = [], []
+    escolhidos, res, ocupados = [], [], []
     for i in ordem:
         a = ini[i]
         if any(abs(a - ini[j]) < jan for j in escolhidos):  # sem sobreposição
             continue
-        escolhidos.append(i)
         ini_s, fim_s = float(a), float(a + jan)
         # ajusta aos limites de frase da transcrição (até 8 s) mantendo 20-45 s
         for s in segmentos:
@@ -124,6 +123,9 @@ def seleciona(ini, nota, s_audio, s_texto, s_chat, detalhe, tem_chat, estouro, o
         fim_s = min(fim_s, ini_s + 45, dur)
         if fim_s - ini_s < 20:
             fim_s = min(ini_s + 20, dur)
+        if any(ini_s < q[1] + 8 and fim_s > q[0] - 8 for q in ocupados):  # mesmo momento já listado
+            continue
+        ocupados.append((ini_s, fim_s)); escolhidos.append(i)
         sl = estouro[int(a): int(a + jan)]
         res.append({
             "inicio_s": round(ini_s + offset, 2), "fim_s": round(fim_s + offset, 2),

@@ -1,4 +1,6 @@
-name: Fase 1 - Picos (chat + áudio + transcrição)
+# Fases 1+2: analisa o VOD em blocos paralelos (chat + áudio + transcrição) e monta a galeria de aprovação.
+# (O nome do arquivo é mantido para não precisar registrar o workflow de novo.)
+name: Fase 1+2 - Picos e galeria de aprovação
 
 on:
   workflow_dispatch:
@@ -8,112 +10,139 @@ on:
         required: true
         type: string
       streamer:
-        description: "id do streamer em streamers.yaml (ex: allanstag)"
+        description: "id do streamer em streamers.yaml"
         required: true
         default: "allanstag"
         type: string
       inicio_seg:
-        description: "Início do trecho analisado (segundos)"
-        required: false
+        description: "Início da análise (segundos)"
         default: "0"
         type: string
       duracao_seg:
-        description: "Duração do trecho analisado (segundos)"
-        required: false
-        default: "1200"
+        description: "Duração a analisar em segundos (0 = até o fim do VOD)"
+        default: "1800"
+        type: string
+      bloco_min:
+        description: "Tamanho de cada bloco paralelo (minutos)"
+        default: "30"
+        type: string
+      top_n:
+        description: "Quantos candidatos na galeria"
+        default: "10"
         type: string
 
 permissions:
   contents: read
 
 jobs:
-  picos:
+  plano:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 10
+    outputs:
+      matriz: ${{ steps.p.outputs.matriz }}
+      vod_ts: ${{ steps.p.outputs.vod_ts }}
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Instalar dependências
-        run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
-          python3 -m pip install --quiet --upgrade "yt-dlp[default,curl-cffi]" faster-whisper numpy pyyaml
-
-      - name: Info do VOD + GATE de permissão
+        with: { python-version: "3.12", cache: pip, cache-dependency-path: requirements.txt }
+      - run: python3 -m pip install --quiet "yt-dlp[default,curl-cffi]" pyyaml
+      - name: Info do VOD, GATE de permissão e plano de blocos
+        id: p
         env:
           VOD_URL: ${{ inputs.vod_url }}
           STREAMER: ${{ inputs.streamer }}
-        run: |
-          mkdir -p trabalho/fase1
-          yt-dlp --no-playlist --dump-single-json --no-download "$VOD_URL" > trabalho/fase1/info.json
-          read TS DUR < <(python3 -I scripts/vod_info.py trabalho/fase1/info.json)
-          echo "VOD_TS=$TS" >> "$GITHUB_ENV"; echo "VOD_DUR=$DUR" >> "$GITHUB_ENV"
-          echo "Início do VOD (epoch UTC): $TS | duração: ${DUR}s"
-          python3 -I scripts/gate.py --id "$STREAMER" --vod-timestamp "$TS"
-
-      - name: Baixar trecho (qualidade mínima, só para análise)
-        env:
-          VOD_URL: ${{ inputs.vod_url }}
           INICIO: ${{ inputs.inicio_seg }}
           DURACAO: ${{ inputs.duracao_seg }}
+          BLOCO: ${{ inputs.bloco_min }}
         run: |
-          FIM=$((INICIO + DURACAO))
-          yt-dlp --no-playlist --newline --download-sections "*${INICIO}-${FIM}" -f worst \
-            --merge-output-format mp4 -o "trabalho/fase1/video.%(ext)s" "$VOD_URL"
-          ls -lh trabalho/fase1
+          yt-dlp --no-playlist --dump-single-json --no-download "$VOD_URL" > info.json
+          read TS DUR < <(python3 -I scripts/vod_info.py info.json)
+          python3 -I scripts/gate.py --id "$STREAMER" --vod-timestamp "$TS"
+          echo "vod_ts=$TS" >> "$GITHUB_OUTPUT"
+          echo "matriz=$(python3 scripts/plano.py "$DUR" "$INICIO" "$DURACAO" "$((BLOCO*60))")" >> "$GITHUB_OUTPUT"
+          echo "VOD: ${DUR}s, início UTC $TS"
 
-      - name: Baixar chat (melhor esforço, só Kick)
+  bloco:
+    needs: plano
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 10
+      matrix: ${{ fromJson(needs.plano.outputs.matriz) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip, cache-dependency-path: requirements.txt }
+      - name: Dependências
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+          python3 -m pip install --quiet -r requirements.txt
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: whisper-small-v1
+      - name: Baixar bloco (360p, serve para análise e prévias)
+        env:
+          VOD_URL: ${{ inputs.vod_url }}
+          INICIO: ${{ matrix.inicio }}
+          DURACAO: ${{ matrix.duracao }}
+        run: |
+          mkdir -p w
+          yt-dlp --no-playlist --quiet --progress --download-sections "*${INICIO}-$((INICIO+DURACAO))" \
+            -f "best[height<=360]/worst" --merge-output-format mp4 -o "w/video.%(ext)s" "$VOD_URL"
+          ls -lh w
+      - name: Chat (melhor esforço)
         continue-on-error: true
         env:
           VOD_URL: ${{ inputs.vod_url }}
-          INICIO: ${{ inputs.inicio_seg }}
-          DURACAO: ${{ inputs.duracao_seg }}
+          VOD_TS: ${{ needs.plano.outputs.vod_ts }}
+          INICIO: ${{ matrix.inicio }}
+          DURACAO: ${{ matrix.duracao }}
         run: |
           if [[ "$VOD_URL" == *kick.com/* ]]; then
             SLUG=$(echo "$VOD_URL" | sed -E 's#.*kick.com/([^/]+)/.*#\1#')
-            python3 scripts/chat_kick.py --slug "$SLUG" --vod-timestamp "$VOD_TS" \
-              --inicio "$INICIO" --duracao "$DURACAO" --out trabalho/fase1/chat.json
-          else
-            echo "Chat só implementado para Kick nesta fase (Twitch entra com TwitchDownloaderCLI)."
+            python3 scripts/chat_kick.py --slug "$SLUG" --vod-timestamp "$VOD_TS" --inicio "$INICIO" \
+              --duracao "$DURACAO" --out w/chat.json | grep -E '^chat(: ok| t_min)' || true
           fi
-
-      - name: Calcular picos
+      - name: Picos e prévias
         env:
-          INICIO: ${{ inputs.inicio_seg }}
+          INICIO: ${{ matrix.inicio }}
         run: |
           set -o pipefail
-          VIDEO=$(ls trabalho/fase1/video.* | head -n1)
-          CHAT=""; [ -f trabalho/fase1/chat.json ] && CHAT="--chat trabalho/fase1/chat.json"
-          python3 scripts/picos.py --video "$VIDEO" --offset "$INICIO" $CHAT \
-            --saida trabalho/fase1/picos.json | tee trabalho/fase1/resumo.txt
-          mv transcricao.json trabalho/fase1/ 2>/dev/null || true
-
-      - name: Resumo
-        if: always()
-        run: |
-          {
-            echo "## Fase 1 — picos"
-            echo '```'
-            cat trabalho/fase1/resumo.txt 2>/dev/null || echo "sem resultado"
-            echo '```'
-            echo "Diagnóstico do chat:"
-            echo '```json'
-            python3 -I -c "import json;d=json.load(open('trabalho/fase1/chat.json'));d['mensagens']=d['mensagens'][:3];print(json.dumps(d,ensure_ascii=False,indent=1)[:3500])" 2>/dev/null || echo "chat não gerado"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Guardar resultados (sem vídeo)
-        if: always()
-        uses: actions/upload-artifact@v4
+          VIDEO=$(ls w/video.* | head -n1)
+          CHAT=""; [ -f w/chat.json ] && CHAT="--chat w/chat.json"
+          python3 scripts/picos.py --video "$VIDEO" --offset "$INICIO" $CHAT --saida w/picos.json | head -1
+          python3 scripts/previas.py --video "$VIDEO" --picos w/picos.json --offset "$INICIO" --saida w/previas
+      - uses: actions/upload-artifact@v4
         with:
-          name: fase1-picos
+          name: bloco-${{ matrix.i }}
           path: |
-            trabalho/fase1/picos.json
-            trabalho/fase1/transcricao.json
-            trabalho/fase1/chat.json
-            trabalho/fase1/resumo.txt
-          retention-days: 7
-          if-no-files-found: ignore
+            w/picos.json
+            w/previas
+          retention-days: 3
+
+  galeria:
+    needs: [plano, bloco]
+    if: ${{ !cancelled() && needs.plano.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: bloco-*
+          path: blocos
+      - name: Montar galeria
+        env:
+          TOP: ${{ inputs.top_n }}
+          META: '{"streamer":"${{ inputs.streamer }}","vod":"${{ inputs.vod_url }}","run":"${{ github.run_id }}"}'
+        run: |
+          python3 scripts/galeria.py --blocos blocos --saida galeria --top "$TOP" --meta "$META" | tee resumo.txt
+          { echo '## Galeria de aprovação'; echo '```'; cat resumo.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          du -sh galeria
+      - uses: actions/upload-artifact@v4
+        with:
+          name: galeria-${{ github.run_id }}
+          path: galeria
+          retention-days: 3
