@@ -43,9 +43,10 @@ def escolhe_frase(segs, gat, max_pal):
 def quebra(frase, larg=24):
     return r"\N".join(textwrap.wrap(frase.upper(), larg)[:3])
 
-def gera_ass(cfg, ed, segs, frase, dur, marca, desloc=0.0):
+def gera_ass(cfg, ed, segs, frase, dur, marca, desloc=0.0, logo=False):
     W, H, top = ed["largura"], ed["altura"], ed["topo_altura"]
     fonte, dest = ed["fonte"], ed["legenda_cor_destaque"]
+    pal = ed["paleta_bgr"]
     linhas = [f"""[Script Info]
 ScriptType: v4.00+
 PlayResX: {W}
@@ -55,7 +56,7 @@ WrapStyle: 2
 [V4+ Styles]
 Format: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding
 Style: Legenda,{fonte},76,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,1,0,0,0,100,100,0,0,1,7,0,2,40,40,{ed['legenda_margem_inferior']},1
-Style: Frase,{fonte},58,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,1,0,0,0,100,100,0,0,3,18,0,5,40,40,0,1
+Style: Frase,Bungee,{ed.get("frase_tamanho", 62)},&H00FFFFFF,&H00FFFFFF,&H00000000,&H00{pal["rosa"]},0,0,0,0,100,100,0,0,1,0,{ed.get("frase_sombra", 6)},5,40,40,0,1
 Style: Marca,{fonte},46,&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,5,0,8,40,40,0,1
 
 [Events]
@@ -63,7 +64,12 @@ Format: Layer,Start,End,Name,Style,MarginL,MarginR,MarginV,Effect,Text"""]
     fim = ass_t(dur)
     linhas.append(f"Dialogue: 2,{ass_t(0)},{fim},,Marca,0,0,0,,{{\\pos({W//2},{ed['marca_dagua_y']})}}{marca}")
     if frase:
-        linhas.append(f"Dialogue: 1,{ass_t(0)},{fim},,Frase,0,0,0,,{{\\pos({W//2},{top})}}{quebra(frase)}")
+        cx = W // 2 + (ed.get("logo_largura", 200) // 2 + 20 if logo else 0)
+        linhas_f = textwrap.wrap(frase.upper(), 14 if logo else 19)[:3]
+        lh = ed.get("frase_entrelinha", 68)
+        for i, ln in enumerate(linhas_f):
+            y = top + (i - (len(linhas_f) - 1) / 2) * lh
+            linhas.append(f"Dialogue: 1,{ass_t(0)},{fim},,Frase,0,0,0,,{{\\pos({cx},{y:.0f})}}{ln}")
     n = ed["legenda_palavras_por_bloco"]
     pal = [{**p, "i": max(0.0, p["i"] + desloc), "f": max(0.0, p["f"] + desloc)} for s in segs for p in s["palavras"]]
     blocos, atual = [], []
@@ -137,9 +143,14 @@ def renderiza(video, ass, saida, lay, ed, logo, inicio_s=0, max_s=None):
          f"[b]crop={jw}:{jh}:{jx}:{jy},scale={W}:{bot}:force_original_aspect_ratio=increase,crop={W}:{bot}[g];"
          f"[t][g]vstack[v]")
     ent = ["-i", video]
+    pal = ed["paleta"]; bh = ed.get("faixa_altura", 230); y0 = top - bh // 2
+    g += (f";[v]drawbox=x=0:y={y0}:w={W}:h={bh}:color=0x{pal['fundo']}@0.94:t=fill,"
+          f"drawbox=x=0:y={y0}:w={W}:h=7:color=0x{pal['ciano']}:t=fill,"
+          f"drawbox=x=0:y={y0 + bh - 7}:w={W}:h=7:color=0x{pal['rosa']}:t=fill[v]")
     if logo:
+        lw = ed.get("logo_largura", 200)
         ent += ["-i", logo]
-        g += f";[1:v]scale=220:-1[l];[v][l]overlay=(W-w)/2:{top}-h/2[v]"
+        g += f";[1:v]scale={lw}:{lw}:flags=lanczos[l];[v][l]overlay=44:{top}-h/2[v]"
     g += f";[v]ass={ass}[o]"
     lim = ["-t", str(max_s)] if max_s else []
     subprocess.run(["ffmpeg", "-v", "error", "-y", *ent, *lim, "-filter_complex", g, "-map", "[o]", "-map", "0:a?",
@@ -154,6 +165,7 @@ def main():
     ap.add_argument("--saida", default="cortes"); ap.add_argument("--config", default="config.yaml")
     ap.add_argument("--altura-max", type=int, default=1080, help="altura máxima do vídeo baixado (teste: 480)")
     ap.add_argument("--atrasos", default="", help="calibração: lista de audio_atraso_s (ex: -0.2,0,0.2); gera 14 s de cada")
+    ap.add_argument("--com-logo", action="store_true", help="força a logo própria (teste); sem isso vale config marca_dagua_propria.ativa")
     ap.add_argument("--streamers", default="streamers.yaml"); ap.add_argument("--titulos", default="titulos.yaml")
     a = ap.parse_args()
     cfg = yaml.safe_load(open(a.config, encoding="utf-8"))
@@ -163,7 +175,7 @@ def main():
     gat = compila_gatilhos(cfg["picos"]["palavras_gatilho"])
     logo = None
     mp = cfg.get("marca_dagua_propria", {})
-    if mp.get("ativa") and os.path.exists(mp["arquivo"]):
+    if (mp.get("ativa") or a.com_logo) and os.path.exists(mp["arquivo"]):
         logo = mp["arquivo"]
     picos = json.load(open(a.picos, encoding="utf-8"))["top"]
     ids = None if a.aprovados.strip().lower() == "todos" else {int(x) for x in a.aprovados.split(",") if x.strip()}
@@ -189,13 +201,13 @@ def main():
             for d in [float(x) for x in a.atrasos.split(",") if x.strip()]:
                 ed2 = {**ed, "audio_atraso_s": d}
                 assd = f"tmp/{n}_{d:+.2f}.ass"
-                open(assd, "w", encoding="utf-8").write(gera_ass(cfg, ed2, segs, frase, dur, camp["marca_dagua_texto"], desloc=d))
+                open(assd, "w", encoding="utf-8").write(gera_ass(cfg, ed2, segs, frase, dur, camp["marca_dagua_texto"], desloc=d, logo=bool(logo)))
                 renderiza(bruto, assd, f"{a.saida}/calibra_{n}_atraso{d:+.2f}.mp4", lay, ed2, logo, p["inicio_s"], max_s=14)
             os.remove(bruto)
             continue
         ass = f"tmp/{n}.ass"
         open(ass, "w", encoding="utf-8").write(gera_ass(cfg, ed, segs, frase, dur, camp["marca_dagua_texto"],
-                                                        desloc=float(ed.get("audio_atraso_s", 0) or 0)))
+                                                        desloc=float(ed.get("audio_atraso_s", 0) or 0), logo=bool(logo)))
         out = f"{a.saida}/corte_{n}.mp4"
         renderiza(bruto, ass, out, lay, ed, logo, p["inicio_s"])
         titulo = (frase[:1].upper() + frase[1:].lower() if frase else "Momento da live") + " " + camp["hashtag_obrigatoria"]

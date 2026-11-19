@@ -24,6 +24,10 @@ on:
         description: "Calibração de sincronia: lista de audio_atraso_s (ex: -0.3,-0.15,0,0.15,0.3). Vazio = corte normal"
         default: ""
         type: string
+      com_logo:
+        description: "Teste: encaixar a logo Modo Gamer BR (true/false). Para publicar só com autorização da organização."
+        default: "false"
+        type: string
       altura_max:
         description: "Altura máxima do vídeo (1080 = final; 480 = teste rápido)"
         default: "1080"
@@ -44,6 +48,7 @@ jobs:
       - name: Dependências
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-dejavu-core
+          mkdir -p ~/.fonts && cp assets/fonts/*.ttf ~/.fonts/ && fc-cache -f
           python3 -m pip install --quiet -r requirements.txt
       - uses: actions/cache@v4
         with:
@@ -70,10 +75,11 @@ jobs:
           STREAMER: ${{ inputs.streamer }}
           ALTURA: ${{ inputs.altura_max }}
           ATRASOS: ${{ inputs.atrasos }}
+          COM_LOGO: ${{ inputs.com_logo }}
         run: |
           set -o pipefail
           python3 scripts/editar.py --picos galeria/picos_final.json --aprovados "$APROVADOS" \
-            --vod "$VOD_URL" --streamer "$STREAMER" --altura-max "$ALTURA" --atrasos="$ATRASOS" --saida cortes | tee resumo.txt
+            --vod "$VOD_URL" --streamer "$STREAMER" --altura-max "$ALTURA" --atrasos="$ATRASOS" $([ "$COM_LOGO" = "true" ] && echo --com-logo) --saida cortes | tee resumo.txt
           { echo '## Fase 3 — cortes editados'; echo '```'; tail -n +1 resumo.txt | grep -v '^==' ; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           du -sh cortes
       - uses: actions/upload-artifact@v4
