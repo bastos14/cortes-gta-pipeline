@@ -89,6 +89,18 @@ def sonda(video):
     d = json.loads(r.stdout)
     return d["streams"][0]["width"], d["streams"][0]["height"], float(d["format"]["duration"])
 
+def inicios(video):
+    """start_time (s) de cada stream: diagnóstico de dessincronia entre vídeo e áudio."""
+    out = {}
+    for s in ("v", "a"):
+        r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", f"{s}:0", "-show_entries", "stream=start_time",
+                            "-of", "csv=p=0", video], capture_output=True, text=True)
+        try:
+            out[s] = float(r.stdout.strip().splitlines()[0])
+        except (ValueError, IndexError):
+            out[s] = None
+    return out
+
 def par(v):
     return int(v) // 2 * 2
 
@@ -108,7 +120,7 @@ def renderiza(video, ass, saida, lay, ed, logo, inicio_s=0):
     jh = par(j.get("h", 1.0) * ih); jw = min(par(jh * W / bot), iw)
     jx, jy = min(par(j["x"] * iw), iw - jw), par(j.get("y", 0.0) * ih)
     g = (f"[0:v]split=2[a][b];"
-         f"[a]crop={cw}:{ch}:{cx}:{cy},scale={W}:{top}:force_original_aspect_ratio=increase,crop={W}:{top}[t];"
+         f"[a]crop={cw}:{ch}:{cx}:{cy},scale={W}:{top}:force_original_aspect_ratio=increase:flags=lanczos,crop={W}:{top},unsharp=5:5:0.7[t];"
          f"[b]crop={jw}:{jh}:{jx}:{jy},scale={W}:{bot}:force_original_aspect_ratio=increase,crop={W}:{bot}[g];"
          f"[t][g]vstack[v]")
     ent = ["-i", video]
@@ -152,9 +164,10 @@ def main():
                 os.remove(os.path.join("tmp", f))
         subprocess.run(["yt-dlp", "--no-playlist", "--quiet", "--force-keyframes-at-cuts",
                         "--download-sections", f"*{int(p['inicio_s'])}-{int(p['fim_s'])}",
-                        "-f", f"bv*[height<={a.altura_max}]+ba/b[height<={a.altura_max}]/best", "--merge-output-format", "mp4",
+                        "-f", f"b[height<={a.altura_max}]/bv*[height<={a.altura_max}]+ba/best", "--merge-output-format", "mp4",
                         "-o", f"tmp/{n}.%(ext)s", a.vod], check=True)
         _, _, dur = sonda(bruto)
+        print(f"   start_time vídeo/áudio: {inicios(bruto)} | formato baixado: {os.path.getsize(bruto)//1024} KB", flush=True)
         segs = transcreve(bruto, ed["whisper_modelo_legenda"])
         frase = limpa(str(manual.get(str(int(p["inicio_s"])), ""))) or escolhe_frase(segs, gat, ed["frase_max_palavras"])
         ass = f"tmp/{n}.ass"
