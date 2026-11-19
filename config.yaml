@@ -20,3 +20,13 @@ dedupe:
 redes_de_saida: [tiktok, shorts]       # Facebook NUNCA (Creator Fast Track)
 narracao:
   ativa: false                         # voz sintética: manter OFF no campeonato (regra 14, a confirmar)
+picos:
+  janela_s: 35            # tamanho da janela candidata (dentro de 20-45 s)
+  passo_s: 5
+  top_n: 10
+  whisper_modelo: small
+  pesos_com_chat:  {chat: 0.35, audio: 0.30, texto: 0.35}
+  pesos_sem_chat:  {audio: 0.45, texto: 0.55}
+  palavras_gatilho:       # reações típicas (peso 1 = normal, 2 = forte)
+    2: [caralho, "meu deus", "não acredito", socorro, "que isso", "o que é isso", "não pode ser", "pelo amor", "que absurdo", "morri", "kkkk", "haha", rsrs]
+    1: [mano, nossa, olha, "ai não", "ferrou", "fui preso", "polícia", "perseguição", "tiro", "morreu", "roubo", "assalto", "bateu", "explodiu", "gente", "eita", "uau", "aí sim", "ganhei", "perdi", "mentira", "sério"]
