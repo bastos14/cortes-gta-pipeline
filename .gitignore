@@ -1,0 +1,16 @@
+# Nunca commitar vídeos, segredos ou dados privados
+*.mp4
+*.mkv
+*.webm
+*.mp3
+*.wav
+*.m4a
+*.ts
+trabalho/
+saida/
+tmp/
+.env
+*.key
+produtos.yaml
+rclone.conf
+__pycache__/
