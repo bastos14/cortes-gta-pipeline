@@ -92,11 +92,17 @@ def sonda(video):
 def par(v):
     return int(v) // 2 * 2
 
-def renderiza(video, ass, saida, lay, ed, logo):
+def camera_do_trecho(lay, inicio_s):
+    for per in lay.get("camera_periodos") or []:
+        if inicio_s < per["ate_s"]:
+            return per["camera"]
+    return lay["camera"]
+
+def renderiza(video, ass, saida, lay, ed, logo, inicio_s=0):
     W, H, top = ed["largura"], ed["altura"], ed["topo_altura"]
     bot = H - top
     iw, ih, _ = sonda(video)
-    c = lay["camera"]; j = lay["jogo"]
+    c = camera_do_trecho(lay, inicio_s); j = lay["jogo"]
     cw, ch = par(c["w"] * iw), par(c["h"] * ih)
     cx, cy = par(c["x"] * iw), par(c["y"] * ih)
     jh = par(j.get("h", 1.0) * ih); jw = min(par(jh * W / bot), iw)
@@ -154,7 +160,7 @@ def main():
         ass = f"tmp/{n}.ass"
         open(ass, "w", encoding="utf-8").write(gera_ass(cfg, ed, segs, frase, dur, camp["marca_dagua_texto"]))
         out = f"{a.saida}/corte_{n}.mp4"
-        renderiza(bruto, ass, out, lay, ed, logo)
+        renderiza(bruto, ass, out, lay, ed, logo, p["inicio_s"])
         titulo = (frase[:1].upper() + frase[1:].lower() if frase else "Momento da live") + " " + camp["hashtag_obrigatoria"]
         manifesto.append({"id": p["id"], "arquivo": out, "vod": a.vod, "inicio_s": p["inicio_s"], "fim_s": p["fim_s"],
                           "duracao_s": round(dur, 1), "frase": frase, "titulo": titulo, "nota": p.get("nota"),
