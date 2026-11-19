@@ -1,0 +1,22 @@
+# Cadastro de streamers. A AUTORIZAÇÃO É DECISÃO DO GABRIEL; o código nunca a infere.
+# status_permissao: aprovado | pendente | negado
+streamers:
+  allanstag:
+    nome: Allan Stag
+    canal: https://kick.com/allanstag
+    plataforma: kick
+    status_permissao: aprovado
+    fonte_da_permissao: >
+      Campeonato de Cortes - Allan Stag (Viewx), regras recebidas em 2026-11-19.
+      Liberado todo conteúdo a partir de 18/11/2026 (inclui participações na Cazé TV).
+      Participação do Gabriel confirmada por ele no chat.
+    regras_da_campanha:
+      conteudo_a_partir_de: "2026-11-18"
+      exige_participacao_ativa_do_streamer: true
+      hashtag_no_titulo: "#allanstag"
+      marca_dagua_obrigatoria: "kick.com/allanstag"   # durante todo o corte e legível
+      plataformas_permitidas: [tiktok, instagram, youtube, facebook, x]
+    # Coordenadas de recorte (pixels, no vídeo de origem). Calibrar na Fase 3 com o print.
+    layout:
+      camera: null   # {x: , y: , w: , h: }
+      jogo: null     # {x: , y: , w: , h: }

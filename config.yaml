@@ -1,0 +1,13 @@
+# Configuração geral do pipeline (sem segredos).
+campanha:
+  hashtag_obrigatoria: "#allanstag"    # vai no TÍTULO de todos os cortes
+  marca_dagua_texto: "kick.com/allanstag"
+corte:
+  duracao_min_s: 20
+  duracao_max_s: 45
+  formato: "9:16"
+marca_dagua_propria:
+  arquivo: assets/logo.png             # "Modo Gamer BR", centralizada na divisória
+redes_de_saida: [tiktok, shorts]       # Facebook NUNCA (Creator Fast Track)
+narracao:
+  ativa: false
