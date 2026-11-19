@@ -16,6 +16,17 @@ streamers:
       hashtag_no_titulo: "#allanstag"
       marca_dagua_obrigatoria: "kick.com/allanstag"   # durante todo o corte e legível
       plataformas_permitidas: [tiktok, instagram, youtube, facebook, x]
+      periodo: {inicio: "2026-11-18", fim: "2026-12-18", ranking_final: "2026-12-20"}
+      # Regras 12/17/18/29 etc.: checadas na galeria de aprovação (revisão humana)
+      proibido:
+        - marcas/lowers/tarjas sobrepostos sem autorização da organização (regra 17)
+        - links de venda, afiliados ou URLs promocionais de terceiros (regra 18)
+        - casas de apostas e jogos de azar (regra 17)
+        - títulos/hashtags/legendas aleatórios ou em outro idioma (regra 12)
+        - repetir o mesmo trecho na mesma plataforma sem mudança significativa (regra 15)
+        - imagens de familiares do Allan (regra 29)
+        - carrossel/post estático; fake react; fake news (regras 21, 28, 9)
+        - cortes feitos exclusivamente por plataformas de IA (regra 14)
     # Coordenadas de recorte (pixels, no vídeo de origem). Calibrar na Fase 3 com o print.
     layout:
       camera: null   # {x: , y: , w: , h: }
