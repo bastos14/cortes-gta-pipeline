@@ -33,6 +33,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
       - name: Instalar dependências
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
@@ -80,6 +84,7 @@ jobs:
         env:
           INICIO: ${{ inputs.inicio_seg }}
         run: |
+          set -o pipefail
           VIDEO=$(ls trabalho/fase1/video.* | head -n1)
           CHAT=""; [ -f trabalho/fase1/chat.json ] && CHAT="--chat trabalho/fase1/chat.json"
           python3 scripts/picos.py --video "$VIDEO" --offset "$INICIO" $CHAT \

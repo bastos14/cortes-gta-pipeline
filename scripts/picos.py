@@ -25,10 +25,11 @@ def serie_volume(x, sr=SR):
     return db, np.maximum(0.0, db - base)
 
 # ---------- transcrição ----------
-def transcreve(video, modelo, idioma="pt"):
+def transcreve(audio, modelo, idioma="pt"):
+    """audio: array float32 mono 16 kHz (evita a decodificação via PyAV)."""
     from faster_whisper import WhisperModel
     m = WhisperModel(modelo, device="cpu", compute_type="int8")
-    segs, _ = m.transcribe(video, language=idioma, vad_filter=True, beam_size=1,
+    segs, _ = m.transcribe(audio, language=idioma, vad_filter=True, beam_size=1,
                            condition_on_previous_text=False)
     return [{"inicio": float(s.start), "fim": float(s.end), "texto": s.text.strip()} for s in segs]
 
@@ -155,7 +156,7 @@ def main():
     if a.transcricao:
         segmentos = json.load(open(a.transcricao, encoding="utf-8"))
     else:
-        segmentos = transcreve(a.video, cfg["whisper_modelo"])
+        segmentos = transcreve(x, cfg["whisper_modelo"])
         json.dump(segmentos, open("transcricao.json", "w", encoding="utf-8"), ensure_ascii=False)
     msgs = []
     if a.chat:
