@@ -52,30 +52,33 @@ def main():
     t0 = a.vod_timestamp + a.inicio
     t1 = t0 + a.duracao
     for cid in ids:
-        pagina_inicial = f"https://kick.com/api/v2/channels/{cid}/messages?start_time={iso(t0)}"
-        url, paginas, coletadas = pagina_inicial, 0, []
-        while url and paginas < 600:
-            r = get(url)
+        base = f"https://kick.com/api/v2/channels/{cid}/messages?start_time="
+        cursor_t, paginas, coletadas, vistos = t0, 0, [], set()
+        while cursor_t < t1 and paginas < 800:
+            r = get(base + iso(cursor_t))
             paginas += 1
             if r is None or r.status_code != 200:
                 break
             try:
-                d = r.json().get("data") or {}
+                ms = (r.json().get("data") or {}).get("messages") or []
             except Exception:
                 break
-            ms = d.get("messages") or []
+            novas, ultimo_ts = 0, None
             for m in ms:
                 try:
-                    t = parse_ts(m["created_at"]) - a.vod_timestamp
-                    coletadas.append({"t": round(t, 2), "texto": (m.get("content") or "")[:200]})
+                    ts = parse_ts(m["created_at"])
                 except Exception:
-                    pass
-            cur = d.get("cursor")
-            ultimo = coletadas[-1]["t"] + a.vod_timestamp if coletadas else None
-            if not ms or not cur or (ultimo and ultimo >= t1):
-                break
-            url = f"{pagina_inicial}&cursor={cur}"
-            time.sleep(0.2)
+                    continue
+                ultimo_ts = ts if ultimo_ts is None else max(ultimo_ts, ts)
+                if m.get("id") in vistos:
+                    continue
+                vistos.add(m.get("id"))
+                novas += 1
+                coletadas.append({"t": round(ts - a.vod_timestamp, 2), "texto": (m.get("content") or "")[:200]})
+            if not novas or ultimo_ts is None:
+                break   # nada novo: acabou ou a API repetiu a página
+            cursor_t = max(ultimo_ts + 0.001, cursor_t + 0.001)
+            time.sleep(0.15)
         diag[f"paginas_id_{cid}"] = paginas
         if coletadas:
             msgs = [m for m in coletadas if a.inicio <= m["t"] <= a.inicio + a.duracao]
