@@ -43,7 +43,7 @@ def escolhe_frase(segs, gat, max_pal):
 def quebra(frase, larg=24):
     return r"\N".join(textwrap.wrap(frase.upper(), larg)[:3])
 
-def gera_ass(cfg, ed, segs, frase, dur, marca):
+def gera_ass(cfg, ed, segs, frase, dur, marca, desloc=0.0):
     W, H, top = ed["largura"], ed["altura"], ed["topo_altura"]
     fonte, dest = ed["fonte"], ed["legenda_cor_destaque"]
     linhas = [f"""[Script Info]
@@ -65,7 +65,7 @@ Format: Layer,Start,End,Name,Style,MarginL,MarginR,MarginV,Effect,Text"""]
     if frase:
         linhas.append(f"Dialogue: 1,{ass_t(0)},{fim},,Frase,0,0,0,,{{\\pos({W//2},{top})}}{quebra(frase)}")
     n = ed["legenda_palavras_por_bloco"]
-    pal = [p for s in segs for p in s["palavras"]]
+    pal = [{**p, "i": max(0.0, p["i"] + desloc), "f": max(0.0, p["f"] + desloc)} for s in segs for p in s["palavras"]]
     blocos, atual = [], []
     for p in pal:
         if atual and (len(atual) >= n or p["i"] - atual[-1]["f"] > 0.8):
@@ -123,7 +123,7 @@ def filtro_audio(ed):
         pre = f"atrim=start={-d:.3f},asetpts=PTS-STARTPTS,"
     return pre + "loudnorm=I=-16:TP=-1.5:LRA=11"
 
-def renderiza(video, ass, saida, lay, ed, logo, inicio_s=0):
+def renderiza(video, ass, saida, lay, ed, logo, inicio_s=0, max_s=None):
     W, H, top = ed["largura"], ed["altura"], ed["topo_altura"]
     bot = H - top
     iw, ih, _ = sonda(video)
@@ -141,7 +141,8 @@ def renderiza(video, ass, saida, lay, ed, logo, inicio_s=0):
         ent += ["-i", logo]
         g += f";[1:v]scale=220:-1[l];[v][l]overlay=(W-w)/2:{top}-h/2[v]"
     g += f";[v]ass={ass}[o]"
-    subprocess.run(["ffmpeg", "-v", "error", "-y", *ent, "-filter_complex", g, "-map", "[o]", "-map", "0:a?",
+    lim = ["-t", str(max_s)] if max_s else []
+    subprocess.run(["ffmpeg", "-v", "error", "-y", *ent, *lim, "-filter_complex", g, "-map", "[o]", "-map", "0:a?",
                     "-r", "30", "-c:v", "libx264", "-preset", "medium", "-crf", str(ed["crf"]), "-pix_fmt", "yuv420p",
                     "-af", filtro_audio(ed), "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", saida], check=True)
 
@@ -152,6 +153,7 @@ def main():
     ap.add_argument("--vod", required=True); ap.add_argument("--streamer", default="allanstag")
     ap.add_argument("--saida", default="cortes"); ap.add_argument("--config", default="config.yaml")
     ap.add_argument("--altura-max", type=int, default=1080, help="altura máxima do vídeo baixado (teste: 480)")
+    ap.add_argument("--atrasos", default="", help="calibração: lista de audio_atraso_s (ex: -0.2,0,0.2); gera 14 s de cada")
     ap.add_argument("--streamers", default="streamers.yaml"); ap.add_argument("--titulos", default="titulos.yaml")
     a = ap.parse_args()
     cfg = yaml.safe_load(open(a.config, encoding="utf-8"))
@@ -183,8 +185,17 @@ def main():
         print(f"   start_time vídeo/áudio: {inicios(bruto)} | formato baixado: {os.path.getsize(bruto)//1024} KB", flush=True)
         segs = transcreve(bruto, ed["whisper_modelo_legenda"])
         frase = limpa(str(manual.get(str(int(p["inicio_s"])), ""))) or escolhe_frase(segs, gat, ed["frase_max_palavras"])
+        if a.atrasos.strip():
+            for d in [float(x) for x in a.atrasos.split(",") if x.strip()]:
+                ed2 = {**ed, "audio_atraso_s": d}
+                assd = f"tmp/{n}_{d:+.2f}.ass"
+                open(assd, "w", encoding="utf-8").write(gera_ass(cfg, ed2, segs, frase, dur, camp["marca_dagua_texto"], desloc=d))
+                renderiza(bruto, assd, f"{a.saida}/calibra_{n}_atraso{d:+.2f}.mp4", lay, ed2, logo, p["inicio_s"], max_s=14)
+            os.remove(bruto)
+            continue
         ass = f"tmp/{n}.ass"
-        open(ass, "w", encoding="utf-8").write(gera_ass(cfg, ed, segs, frase, dur, camp["marca_dagua_texto"]))
+        open(ass, "w", encoding="utf-8").write(gera_ass(cfg, ed, segs, frase, dur, camp["marca_dagua_texto"],
+                                                        desloc=float(ed.get("audio_atraso_s", 0) or 0)))
         out = f"{a.saida}/corte_{n}.mp4"
         renderiza(bruto, ass, out, lay, ed, logo, p["inicio_s"])
         titulo = (frase[:1].upper() + frase[1:].lower() if frase else "Momento da live") + " " + camp["hashtag_obrigatoria"]

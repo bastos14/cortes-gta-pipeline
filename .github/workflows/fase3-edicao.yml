@@ -20,6 +20,10 @@ on:
         description: "id do streamer em streamers.yaml"
         default: "allanstag"
         type: string
+      atrasos:
+        description: "Calibração de sincronia: lista de audio_atraso_s (ex: -0.3,-0.15,0,0.15,0.3). Vazio = corte normal"
+        default: ""
+        type: string
       altura_max:
         description: "Altura máxima do vídeo (1080 = final; 480 = teste rápido)"
         default: "1080"
@@ -65,10 +69,11 @@ jobs:
           APROVADOS: ${{ inputs.aprovados }}
           STREAMER: ${{ inputs.streamer }}
           ALTURA: ${{ inputs.altura_max }}
+          ATRASOS: ${{ inputs.atrasos }}
         run: |
           set -o pipefail
           python3 scripts/editar.py --picos galeria/picos_final.json --aprovados "$APROVADOS" \
-            --vod "$VOD_URL" --streamer "$STREAMER" --altura-max "$ALTURA" --saida cortes | tee resumo.txt
+            --vod "$VOD_URL" --streamer "$STREAMER" --altura-max "$ALTURA" --atrasos "$ATRASOS" --saida cortes | tee resumo.txt
           { echo '## Fase 3 — cortes editados'; echo '```'; tail -n +1 resumo.txt | grep -v '^==' ; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           du -sh cortes
       - uses: actions/upload-artifact@v4
