@@ -1,0 +1,32 @@
+# Configuração geral do pipeline (sem segredos).
+campanha:
+  hashtag_obrigatoria: "#allanstag"    # vai no TÍTULO de todos os cortes
+  marca_dagua_texto: "kick.com/allanstag"   # obrigatória, o corte todo, legível
+  idioma_textos: pt-BR                 # regra 12: sem títulos/hashtags em outro idioma
+corte:
+  duracao_min_s: 20
+  duracao_max_s: 45
+  formato: "9:16"
+# REGRA 17: qualquer marca/logo sobreposto precisa de autorização prévia da organização.
+# Fica DESLIGADA nos cortes do campeonato até o Gabriel receber o OK do administrador.
+marca_dagua_propria:
+  arquivo: assets/logo.png             # "Modo Gamer BR", centralizada na divisória
+  ativa: false
+publicacao:
+  max_cortes_por_dia_por_rede: 4       # regras 22/26: evitar volume artificial; ajustável
+  intervalo_minimo_entre_posts_min: 90
+dedupe:
+  mesma_plataforma_trecho_repetido: bloquear   # regra 15
+redes_de_saida: [tiktok, shorts]       # Facebook NUNCA (Creator Fast Track)
+narracao:
+  ativa: false                         # voz sintética: manter OFF no campeonato (regra 14, a confirmar)
+picos:
+  janela_s: 35            # tamanho da janela candidata (dentro de 20-45 s)
+  passo_s: 5
+  top_n: 10
+  whisper_modelo: small
+  pesos_com_chat:  {chat: 0.35, audio: 0.30, texto: 0.35}
+  pesos_sem_chat:  {audio: 0.45, texto: 0.55}
+  palavras_gatilho:       # reações típicas (peso 1 = normal, 2 = forte)
+    2: [caralho, "meu deus", "não acredito", socorro, "que isso", "o que é isso", "não pode ser", "pelo amor", "que absurdo", "morri", "kkkk", "haha", rsrs]
+    1: [mano, nossa, olha, "ai não", "ferrou", "fui preso", "polícia", "perseguição", "tiro", "morreu", "roubo", "assalto", "bateu", "explodiu", "gente", "eita", "uau", "aí sim", "ganhei", "perdi", "mentira", "sério"]

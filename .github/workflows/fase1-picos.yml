@@ -1,0 +1,114 @@
+name: Fase 1 - Picos (chat + áudio + transcrição)
+
+on:
+  workflow_dispatch:
+    inputs:
+      vod_url:
+        description: "URL do VOD (Kick ou Twitch)"
+        required: true
+        type: string
+      streamer:
+        description: "id do streamer em streamers.yaml (ex: allanstag)"
+        required: true
+        default: "allanstag"
+        type: string
+      inicio_seg:
+        description: "Início do trecho analisado (segundos)"
+        required: false
+        default: "0"
+        type: string
+      duracao_seg:
+        description: "Duração do trecho analisado (segundos)"
+        required: false
+        default: "1200"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  picos:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar dependências
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+          python3 -m pip install --quiet --upgrade "yt-dlp[default,curl-cffi]" faster-whisper numpy pyyaml
+
+      - name: Info do VOD + GATE de permissão
+        env:
+          VOD_URL: ${{ inputs.vod_url }}
+          STREAMER: ${{ inputs.streamer }}
+        run: |
+          mkdir -p trabalho/fase1
+          yt-dlp --no-playlist --dump-single-json --no-download "$VOD_URL" > trabalho/fase1/info.json
+          read TS DUR < <(python3 -I scripts/vod_info.py trabalho/fase1/info.json)
+          echo "VOD_TS=$TS" >> "$GITHUB_ENV"; echo "VOD_DUR=$DUR" >> "$GITHUB_ENV"
+          echo "Início do VOD (epoch UTC): $TS | duração: ${DUR}s"
+          python3 -I scripts/gate.py --id "$STREAMER" --vod-timestamp "$TS"
+
+      - name: Baixar trecho (qualidade mínima, só para análise)
+        env:
+          VOD_URL: ${{ inputs.vod_url }}
+          INICIO: ${{ inputs.inicio_seg }}
+          DURACAO: ${{ inputs.duracao_seg }}
+        run: |
+          FIM=$((INICIO + DURACAO))
+          yt-dlp --no-playlist --newline --download-sections "*${INICIO}-${FIM}" -f worst \
+            --merge-output-format mp4 -o "trabalho/fase1/video.%(ext)s" "$VOD_URL"
+          ls -lh trabalho/fase1
+
+      - name: Baixar chat (melhor esforço, só Kick)
+        continue-on-error: true
+        env:
+          VOD_URL: ${{ inputs.vod_url }}
+          INICIO: ${{ inputs.inicio_seg }}
+          DURACAO: ${{ inputs.duracao_seg }}
+        run: |
+          if [[ "$VOD_URL" == *kick.com/* ]]; then
+            SLUG=$(echo "$VOD_URL" | sed -E 's#.*kick.com/([^/]+)/.*#\1#')
+            python3 scripts/chat_kick.py --slug "$SLUG" --vod-timestamp "$VOD_TS" \
+              --inicio "$INICIO" --duracao "$DURACAO" --out trabalho/fase1/chat.json
+          else
+            echo "Chat só implementado para Kick nesta fase (Twitch entra com TwitchDownloaderCLI)."
+          fi
+
+      - name: Calcular picos
+        env:
+          INICIO: ${{ inputs.inicio_seg }}
+        run: |
+          VIDEO=$(ls trabalho/fase1/video.* | head -n1)
+          CHAT=""; [ -f trabalho/fase1/chat.json ] && CHAT="--chat trabalho/fase1/chat.json"
+          python3 scripts/picos.py --video "$VIDEO" --offset "$INICIO" $CHAT \
+            --saida trabalho/fase1/picos.json | tee trabalho/fase1/resumo.txt
+          mv transcricao.json trabalho/fase1/ 2>/dev/null || true
+
+      - name: Resumo
+        if: always()
+        run: |
+          {
+            echo "## Fase 1 — picos"
+            echo '```'
+            cat trabalho/fase1/resumo.txt 2>/dev/null || echo "sem resultado"
+            echo '```'
+            echo "Diagnóstico do chat:"
+            echo '```json'
+            python3 -I -c "import json;d=json.load(open('trabalho/fase1/chat.json'));d['mensagens']=d['mensagens'][:3];print(json.dumps(d,ensure_ascii=False,indent=1)[:3500])" 2>/dev/null || echo "chat não gerado"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Guardar resultados (sem vídeo)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fase1-picos
+          path: |
+            trabalho/fase1/picos.json
+            trabalho/fase1/transcricao.json
+            trabalho/fase1/chat.json
+            trabalho/fase1/resumo.txt
+          retention-days: 7
+          if-no-files-found: ignore
