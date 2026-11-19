@@ -120,6 +120,7 @@ def main():
     ap.add_argument("--aprovados", default="todos", help="ids separados por vírgula ou 'todos'")
     ap.add_argument("--vod", required=True); ap.add_argument("--streamer", default="allanstag")
     ap.add_argument("--saida", default="cortes"); ap.add_argument("--config", default="config.yaml")
+    ap.add_argument("--altura-max", type=int, default=1080, help="altura máxima do vídeo baixado (teste: 480)")
     ap.add_argument("--streamers", default="streamers.yaml"); ap.add_argument("--titulos", default="titulos.yaml")
     a = ap.parse_args()
     cfg = yaml.safe_load(open(a.config, encoding="utf-8"))
@@ -145,7 +146,7 @@ def main():
                 os.remove(os.path.join("tmp", f))
         subprocess.run(["yt-dlp", "--no-playlist", "--quiet", "--force-keyframes-at-cuts",
                         "--download-sections", f"*{int(p['inicio_s'])}-{int(p['fim_s'])}",
-                        "-f", "bv*[height<=1080]+ba/b[height<=1080]/best", "--merge-output-format", "mp4",
+                        "-f", f"bv*[height<={a.altura_max}]+ba/b[height<={a.altura_max}]/best", "--merge-output-format", "mp4",
                         "-o", f"tmp/{n}.%(ext)s", a.vod], check=True)
         _, _, dur = sonda(bruto)
         segs = transcreve(bruto, ed["whisper_modelo_legenda"])

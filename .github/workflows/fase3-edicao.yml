@@ -20,6 +20,10 @@ on:
         description: "id do streamer em streamers.yaml"
         default: "allanstag"
         type: string
+      altura_max:
+        description: "Altura máxima do vídeo (1080 = final; 480 = teste rápido)"
+        default: "1080"
+        type: string
 
 permissions:
   contents: read
@@ -60,10 +64,11 @@ jobs:
           VOD_URL: ${{ inputs.vod_url }}
           APROVADOS: ${{ inputs.aprovados }}
           STREAMER: ${{ inputs.streamer }}
+          ALTURA: ${{ inputs.altura_max }}
         run: |
           set -o pipefail
           python3 scripts/editar.py --picos galeria/picos_final.json --aprovados "$APROVADOS" \
-            --vod "$VOD_URL" --streamer "$STREAMER" --saida cortes | tee resumo.txt
+            --vod "$VOD_URL" --streamer "$STREAMER" --altura-max "$ALTURA" --saida cortes | tee resumo.txt
           { echo '## Fase 3 — cortes editados'; echo '```'; tail -n +1 resumo.txt | grep -v '^==' ; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           du -sh cortes
       - uses: actions/upload-artifact@v4
