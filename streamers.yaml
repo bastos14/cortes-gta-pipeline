@@ -27,7 +27,7 @@ streamers:
         - imagens de familiares do Allan (regra 29)
         - carrossel/post estático; fake react; fake news (regras 21, 28, 9)
         - cortes feitos exclusivamente por plataformas de IA (regra 14)
-    # Coordenadas de recorte (pixels, no vídeo de origem). Calibrar na Fase 3 com o print.
+    # Recortes como FRAÇÃO do quadro (valem para qualquer resolução). Calibrado pelo print da live (19/11).
     layout:
-      camera: null   # {x: , y: , w: , h: }
-      jogo: null     # {x: , y: , w: , h: }
+      camera: {x: 0.759, y: 0.385, w: 0.230, h: 0.226}   # webcam no canto direito, sem a borda nem o @ de terceiros
+      jogo:   {x: 0.17,  y: 0.0,   h: 1.0}               # faixa central do jogo; a largura sai da proporção da área de baixo

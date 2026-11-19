@@ -1,0 +1,4 @@
+# Frases de abertura manuais (opcional). Chave = segundo de início do corte no VOD (como em picos_final.json).
+# Sem entrada, o editor usa uma fala REAL do próprio streamer no trecho (nunca inventa fato; regra 8).
+# Exemplo:  "7421": "Ele não acreditou no que viu"
+{}
