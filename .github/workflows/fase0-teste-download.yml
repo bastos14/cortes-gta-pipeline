@@ -1,0 +1,51 @@
+name: Fase 0 - Teste de download
+
+on:
+  workflow_dispatch:
+    inputs:
+      vod_url:
+        description: "URL do VOD de teste (ex: https://www.twitch.tv/videos/123456789)"
+        required: true
+        type: string
+      inicio_seg:
+        description: "Início do trecho em segundos"
+        required: false
+        default: "0"
+        type: string
+      duracao_seg:
+        description: "Duração do trecho em segundos (600 = 10 min)"
+        required: false
+        default: "600"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  teste-download:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar ffmpeg, yt-dlp e twitch-dl
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          python3 -m pip install --quiet --upgrade yt-dlp twitch-dl
+
+      - name: Baixar trecho e reportar
+        env:
+          VOD_URL: ${{ inputs.vod_url }}
+          INICIO: ${{ inputs.inicio_seg }}
+          DURACAO: ${{ inputs.duracao_seg }}
+        run: ./scripts/fase0_teste_download.sh "$VOD_URL" "$INICIO" "$DURACAO"
+
+      - name: Guardar log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fase0-log
+          path: trabalho/fase0/download.log
+          retention-days: 3
+          if-no-files-found: ignore
