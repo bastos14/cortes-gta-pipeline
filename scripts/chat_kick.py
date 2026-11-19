@@ -82,6 +82,16 @@ def main():
             ok = len(msgs) > 0
             break
     diag["mensagens_no_trecho"] = len(msgs)
+    ts = sorted(m["t"] for m in msgs)
+    if ts:
+        hist = {}
+        for t in ts:
+            hist[int(t // 60)] = hist.get(int(t // 60), 0) + 1
+        diag["t_min_max"] = [ts[0], ts[-1]]
+        diag["msgs_por_minuto"] = dict(sorted(hist.items()))
+        print("chat t_min/max:", ts[0], ts[-1], "| msgs por minuto:", dict(sorted(hist.items())))
+    for p in diag["passos"][:6]:
+        print("chat passo:", p.get("status"), p.get("url", "")[:140], "|", (p.get("trecho") or p.get("erro") or "")[:120].replace("\n", " "))
     json.dump({"ok": ok, "mensagens": msgs, "diag": diag}, open(a.out, "w", encoding="utf-8"), ensure_ascii=False)
     print(f"chat: ok={ok} mensagens={len(msgs)}")
     return 0

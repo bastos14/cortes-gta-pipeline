@@ -174,6 +174,7 @@ def main():
     print(f"{len(top)} picos; chat_usado={tem_chat}")
     for r in top:
         print(f"{r['inicio_hms']}-{r['fim_hms']}  nota {r['nota']:5.1f}  {r['motivo']}")
+        print(f"    fala: {r['trecho_falado'][:220]}")
 
 if __name__ == "__main__":
     main()
