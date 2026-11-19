@@ -25,10 +25,11 @@ def serie_volume(x, sr=SR):
     return db, np.maximum(0.0, db - base)
 
 # ---------- transcrição ----------
-def transcreve(video, modelo, idioma="pt"):
+def transcreve(audio, modelo, idioma="pt"):
+    """audio: array float32 mono 16 kHz (evita a decodificação via PyAV)."""
     from faster_whisper import WhisperModel
     m = WhisperModel(modelo, device="cpu", compute_type="int8")
-    segs, _ = m.transcribe(video, language=idioma, vad_filter=True, beam_size=1,
+    segs, _ = m.transcribe(audio, language=idioma, vad_filter=True, beam_size=1,
                            condition_on_previous_text=False)
     return [{"inicio": float(s.start), "fim": float(s.end), "texto": s.text.strip()} for s in segs]
 
@@ -107,12 +108,11 @@ def motivo(i, s_audio, s_texto, s_chat, det, tem_chat, estouro_db):
 def seleciona(ini, nota, s_audio, s_texto, s_chat, detalhe, tem_chat, estouro, offset, cfg, segmentos, dur):
     jan, top = cfg["janela_s"], cfg["top_n"]
     ordem = np.argsort(-nota)
-    escolhidos, res = [], []
+    escolhidos, res, ocupados = [], [], []
     for i in ordem:
         a = ini[i]
         if any(abs(a - ini[j]) < jan for j in escolhidos):  # sem sobreposição
             continue
-        escolhidos.append(i)
         ini_s, fim_s = float(a), float(a + jan)
         # ajusta aos limites de frase da transcrição (até 8 s) mantendo 20-45 s
         for s in segmentos:
@@ -123,6 +123,9 @@ def seleciona(ini, nota, s_audio, s_texto, s_chat, detalhe, tem_chat, estouro, o
         fim_s = min(fim_s, ini_s + 45, dur)
         if fim_s - ini_s < 20:
             fim_s = min(ini_s + 20, dur)
+        if any(ini_s < q[1] + 8 and fim_s > q[0] - 8 for q in ocupados):  # mesmo momento já listado
+            continue
+        ocupados.append((ini_s, fim_s)); escolhidos.append(i)
         sl = estouro[int(a): int(a + jan)]
         res.append({
             "inicio_s": round(ini_s + offset, 2), "fim_s": round(fim_s + offset, 2),
@@ -155,7 +158,7 @@ def main():
     if a.transcricao:
         segmentos = json.load(open(a.transcricao, encoding="utf-8"))
     else:
-        segmentos = transcreve(a.video, cfg["whisper_modelo"])
+        segmentos = transcreve(x, cfg["whisper_modelo"])
         json.dump(segmentos, open("transcricao.json", "w", encoding="utf-8"), ensure_ascii=False)
     msgs = []
     if a.chat:
@@ -173,6 +176,7 @@ def main():
     print(f"{len(top)} picos; chat_usado={tem_chat}")
     for r in top:
         print(f"{r['inicio_hms']}-{r['fim_hms']}  nota {r['nota']:5.1f}  {r['motivo']}")
+        print(f"    fala: {r['trecho_falado'][:220]}")
 
 if __name__ == "__main__":
     main()

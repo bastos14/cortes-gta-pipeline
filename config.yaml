@@ -29,4 +29,5 @@ picos:
   pesos_sem_chat:  {audio: 0.45, texto: 0.55}
   palavras_gatilho:       # reações típicas (peso 1 = normal, 2 = forte)
     2: [caralho, "meu deus", "não acredito", socorro, "que isso", "o que é isso", "não pode ser", "pelo amor", "que absurdo", "morri", "kkkk", "haha", rsrs]
-    1: [mano, nossa, olha, "ai não", "ferrou", "fui preso", "polícia", "perseguição", "tiro", "morreu", "roubo", "assalto", "bateu", "explodiu", "gente", "eita", "uau", "aí sim", "ganhei", "perdi", "mentira", "sério"]
+    0.5: [mano, nossa, olha, gente, uau, eita, sério]
+    1: ["ai não", "ferrou", "fui preso", "polícia", "perseguição", "tiro", "morreu", "roubo", "assalto", "bateu", "explodiu", "aí sim", "ganhei", "perdi", "mentira"]
