@@ -40,7 +40,7 @@ def escolhe_frase(segs, gat, max_pal):
     pal = melhor["texto"].replace("...", " ").split()[:max_pal]
     return " ".join(pal).rstrip(",;:-")
 
-def quebra(frase, larg=18):
+def quebra(frase, larg=24):
     return r"\N".join(textwrap.wrap(frase.upper(), larg)[:3])
 
 def gera_ass(cfg, ed, segs, frase, dur, marca):
@@ -75,10 +75,13 @@ Format: Layer,Start,End,Name,Style,MarginL,MarginR,MarginV,Effect,Text"""]
             blocos.append(atual); atual = []
     if atual:
         blocos.append(atual)
-    for b in blocos:
+    for bi, b in enumerate(blocos):
+        prox = blocos[bi + 1][0]["i"] if bi + 1 < len(blocos) else dur
         for k, p in enumerate(b):
             ini = p["i"]
-            f = b[k + 1]["i"] if k + 1 < len(b) else min(p["f"] + 0.15, dur)
+            f = b[k + 1]["i"] if k + 1 < len(b) else min(p["f"] + 0.15, prox, dur)
+            if f <= ini:
+                continue
             txt = " ".join((f"{{\\c&H{dest}&}}{q['w'].upper()}{{\\c&HFFFFFF&}}" if j == k else q["w"].upper()) for j, q in enumerate(b))
             linhas.append(f"Dialogue: 0,{ass_t(ini)},{ass_t(f)},,Legenda,0,0,0,,{txt}")
     return "\n".join(linhas) + "\n"
@@ -110,6 +113,16 @@ def camera_do_trecho(lay, inicio_s):
             return per["camera"]
     return lay["camera"]
 
+def filtro_audio(ed):
+    """audio_atraso_s > 0 atrasa o áudio (boca aparece ANTES do som); < 0 adianta (boca DEPOIS do som)."""
+    d = float(ed.get("audio_atraso_s", 0) or 0)
+    pre = ""
+    if d > 0:
+        pre = f"adelay={int(d*1000)}|{int(d*1000)},"
+    elif d < 0:
+        pre = f"atrim=start={-d:.3f},asetpts=PTS-STARTPTS,"
+    return pre + "loudnorm=I=-16:TP=-1.5:LRA=11"
+
 def renderiza(video, ass, saida, lay, ed, logo, inicio_s=0):
     W, H, top = ed["largura"], ed["altura"], ed["topo_altura"]
     bot = H - top
@@ -130,7 +143,7 @@ def renderiza(video, ass, saida, lay, ed, logo, inicio_s=0):
     g += f";[v]ass={ass}[o]"
     subprocess.run(["ffmpeg", "-v", "error", "-y", *ent, "-filter_complex", g, "-map", "[o]", "-map", "0:a?",
                     "-r", "30", "-c:v", "libx264", "-preset", "medium", "-crf", str(ed["crf"]), "-pix_fmt", "yuv420p",
-                    "-af", "loudnorm=I=-16:TP=-1.5:LRA=11", "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", saida], check=True)
+                    "-af", filtro_audio(ed), "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", saida], check=True)
 
 def main():
     ap = argparse.ArgumentParser()
