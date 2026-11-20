@@ -210,10 +210,11 @@ def main():
                                                         desloc=float(ed.get("audio_atraso_s", 0) or 0), logo=bool(logo)))
         out = f"{a.saida}/corte_{n}.mp4"
         renderiza(bruto, ass, out, lay, ed, logo, p["inicio_s"])
-        titulo = (frase[:1].upper() + frase[1:].lower() if frase else "Momento da live") + " " + camp["hashtag_obrigatoria"]
+        titulo = (frase[:1].upper() + frase[1:] if frase else "Momento da live") + " " + camp["hashtag_obrigatoria"]
         manifesto.append({"id": p["id"], "arquivo": out, "vod": a.vod, "inicio_s": p["inicio_s"], "fim_s": p["fim_s"],
                           "duracao_s": round(dur, 1), "frase": frase, "titulo": titulo, "nota": p.get("nota"),
-                          "motivo": p.get("motivo"), "logo_propria": bool(logo)})
+                          "motivo": p.get("motivo"), "logo_propria": bool(logo),
+                          "texto": " ".join(s["texto"] for s in segs)})
         os.remove(bruto)
     json.dump(manifesto, open(f"{a.saida}/manifesto.json", "w", encoding="utf-8"), ensure_ascii=False, indent=2)
     print(f"{'id':>3} {'dur':>5}  frase de abertura | título")
