@@ -31,6 +31,17 @@ picos:
     2: [caralho, "meu deus", "não acredito", socorro, "que isso", "o que é isso", "não pode ser", "pelo amor", "que absurdo", "morri", "kkkk", "haha", rsrs]
     0.5: [mano, nossa, olha, gente, uau, eita, sério]
     1: ["ai não", "ferrou", "fui preso", "polícia", "perseguição", "tiro", "morreu", "roubo", "assalto", "bateu", "explodiu", "aí sim", "ganhei", "perdi", "mentira"]
+  # ---- filtro das REGRAS (Fase 2): janela com estes termos na fala (inclui o áudio do jogo) nunca entra ----
+  bloqueio:
+    sexual: ["rola\\b", "chupar", "chupa\\b", "transa", "sexo", "sexual", "peito", "bunda", "buceta", "pica\\b", "punheta", "tesao", "estupr"]
+    drogas: ["cocain", "maconha", "droga", "crack", "heroin", "cheirar", "baseado", "lsd", "metanfet", "overdose", "traficante", "trafico"]
+    apostas: ["aposta", "apostar", "bet\\b", "bet365", "cassino", "tigrinho", "jogo do bicho", "blaze", "roleta", "cupom", "codigo promocional"]
+    marcas_links: ["instagram", "tiktok", "youtube", "facebook", "twitter", "whatsapp", "link na bio", "\\.com", "ifood", "uber", "nike"]
+    sensivel: ["suicid", "nazi", "hitler", "racis", "viado", "bicha", "macaco", "politic", "bolsonaro", "lula", "trump"]
+  palavrao: ["caralh", "porra", "fod", "fud", "put[ao]", "merda", "cacete", "cuzao", "viado", "otario", "arrombad"]
+  palavrao_max: 2
+  movimento_percentil_min: 30
+  movimento_penalidade: 0.6
 edicao:                   # Fase 3 (layout 9:16: streamer em cima, jogo embaixo)
   largura: 1080
   altura: 1920

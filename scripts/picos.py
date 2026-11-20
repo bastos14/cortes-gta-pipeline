@@ -24,6 +24,21 @@ def serie_volume(x, sr=SR):
     base = np.array([np.median(db[max(0, i - 60): i + 60]) for i in range(n)])
     return db, np.maximum(0.0, db - base)
 
+# ---------- movimento do vídeo (descarta "personagem parado/andando sem nada") ----------
+def serie_movimento(video, dur):
+    """Média da diferença entre quadros (2 fps, 64x36, cinza) por segundo. Cena/ação variada = valor alto."""
+    cmd = ["ffmpeg", "-v", "error", "-i", video, "-an", "-vf", "fps=2,scale=64:36,format=gray", "-f", "rawvideo", "-"]
+    raw = subprocess.run(cmd, capture_output=True).stdout
+    q = np.frombuffer(raw, dtype=np.uint8).reshape(-1, 36 * 64).astype(np.float32)
+    if len(q) < 3:
+        return np.zeros(int(dur) + 1)
+    d = np.abs(np.diff(q, axis=0)).mean(1)
+    seg = np.zeros(int(dur) + 1)
+    for s in range(len(seg)):
+        a = d[2 * s: 2 * s + 2]
+        seg[s] = a.mean() if len(a) else 0.0
+    return seg
+
 # ---------- transcrição ----------
 def transcreve(audio, modelo, idioma="pt"):
     """audio: array float32 mono 16 kHz (evita a decodificação via PyAV)."""
@@ -32,6 +47,20 @@ def transcreve(audio, modelo, idioma="pt"):
     segs, _ = m.transcribe(audio, language=idioma, vad_filter=True, beam_size=1,
                            condition_on_previous_text=False)
     return [{"inicio": float(s.start), "fim": float(s.end), "texto": s.text.strip()} for s in segs]
+
+def viola_regras(texto, cfg):
+    """Procura termos proibidos pelas regras (sexual, drogas, apostas, marcas/links). Devolve a lista de achados."""
+    n = norm(texto)
+    achados = []
+    for cat, termos in (cfg.get("bloqueio") or {}).items():
+        for termo in termos:
+            if re.search(r"(?<![a-z0-9])" + termo, n):
+                achados.append(f"{cat}:{termo}")
+    return achados
+
+def conta_palavrao(texto, cfg):
+    n = norm(texto)
+    return sum(len(re.findall(r"(?<![a-z0-9])" + termo, n)) for termo in cfg.get("palavrao", []))
 
 def norm(t):
     t = unicodedata.normalize("NFKD", t.lower())
@@ -65,7 +94,7 @@ def janelas(dur, janela, passo):
     ini = np.arange(0, max(dur - janela, 0) + 1e-9, passo)
     return ini
 
-def pontua(offset, dur, estouro, mensagens, segmentos, gatilhos, cfg):
+def pontua(offset, dur, estouro, mensagens, segmentos, gatilhos, cfg, movimento=None):
     jan, passo = cfg["janela_s"], cfg["passo_s"]
     ini = janelas(dur, jan, passo)
     f_audio = np.zeros(len(ini)); f_chat = np.zeros(len(ini)); f_texto = np.zeros(len(ini))
@@ -84,12 +113,27 @@ def pontua(offset, dur, estouro, mensagens, segmentos, gatilhos, cfg):
                 pts += p; ach += ac; palavras += len(s["texto"].split())
         pts += 0.5 * (palavras / jan)  # ritmo de fala (palavras/s)
         f_texto[i] = pts
-        detalhe.append({"msgs": n_msg, "gatilhos": ach, "pico_db": float(np.max(sl)) if len(sl) else 0.0})
+        texto_jan = " ".join(s["texto"] for s in segmentos if s["fim"] > a and s["inicio"] < b)
+        bloq = viola_regras(texto_jan, cfg)
+        mov = float(np.mean(movimento[int(a): int(b)])) if movimento is not None and len(movimento) else None
+        detalhe.append({"msgs": n_msg, "gatilhos": ach, "pico_db": float(np.max(sl)) if len(sl) else 0.0,
+                        "bloqueios": bloq, "palavroes": conta_palavrao(texto_jan, cfg), "movimento": mov})
     tem_chat = len(tmsg) > 0
     s_audio, s_texto = escala(f_audio), escala(f_texto)
     s_chat = escala(f_chat) if tem_chat else np.zeros(len(ini))
     w = cfg["pesos_com_chat"] if tem_chat else cfg["pesos_sem_chat"]
     nota = 100 * (w.get("audio", 0) * s_audio + w.get("texto", 0) * s_texto + w.get("chat", 0) * s_chat)
+    movs = np.array([d["movimento"] if d["movimento"] is not None else np.nan for d in detalhe], dtype=float)
+    if not np.all(np.isnan(movs)):
+        corte = np.nanpercentile(movs, cfg.get("movimento_percentil_min", 30))
+        for i, d in enumerate(detalhe):
+            if d["movimento"] is not None and d["movimento"] < corte:
+                nota[i] *= cfg.get("movimento_penalidade", 0.6)   # cena parada: pouco potencial
+    for i, d in enumerate(detalhe):
+        if d["bloqueios"]:
+            nota[i] = 0.0                                    # viola as regras: nunca entra
+        elif d["palavroes"] > cfg.get("palavrao_max", 2):
+            nota[i] *= 0.4                                   # muito palavrão: arriscado nas plataformas
     return ini, nota, s_audio, s_texto, s_chat, detalhe, tem_chat
 
 def motivo(i, s_audio, s_texto, s_chat, det, tem_chat, estouro_db):
@@ -111,6 +155,8 @@ def seleciona(ini, nota, s_audio, s_texto, s_chat, detalhe, tem_chat, estouro, o
     escolhidos, res, ocupados = [], [], []
     for i in ordem:
         a = ini[i]
+        if nota[i] <= 0:
+            break
         if any(abs(a - ini[j]) < jan for j in escolhidos):  # sem sobreposição
             continue
         ini_s, fim_s = float(a), float(a + jan)
@@ -131,6 +177,7 @@ def seleciona(ini, nota, s_audio, s_texto, s_chat, detalhe, tem_chat, estouro, o
             "inicio_s": round(ini_s + offset, 2), "fim_s": round(fim_s + offset, 2),
             "duracao_s": round(fim_s - ini_s, 2), "nota": round(float(nota[i]), 1),
             "motivo": motivo(i, s_audio, s_texto, s_chat, detalhe[i], tem_chat, float(sl.max()) if len(sl) else 0.0),
+            "palavroes": detalhe[i]["palavroes"], "movimento": None if detalhe[i]["movimento"] is None else round(detalhe[i]["movimento"], 2),
             "sinais": {"audio": round(float(s_audio[i]), 2), "texto": round(float(s_texto[i]), 2),
                        "chat": round(float(s_chat[i]), 2), "msgs_chat": detalhe[i]["msgs"]},
             "trecho_falado": " ".join(s["texto"] for s in segmentos if s["fim"] > ini_s and s["inicio"] < fim_s)[:500],
@@ -165,7 +212,8 @@ def main():
         c = json.load(open(a.chat, encoding="utf-8"))
         msgs = c.get("mensagens", []) if c.get("ok") else []
     gat = compila_gatilhos(cfg["palavras_gatilho"])
-    ini, nota, sa, st, sc, det, tem_chat = pontua(a.offset, dur, estouro, msgs, segmentos, gat, cfg)
+    mov = serie_movimento(a.video, dur)
+    ini, nota, sa, st, sc, det, tem_chat = pontua(a.offset, dur, estouro, msgs, segmentos, gat, cfg, mov)
     top = seleciona(ini, nota, sa, st, sc, det, tem_chat, estouro, a.offset, cfg, segmentos, dur)
     for r in top:
         r["inicio_hms"], r["fim_hms"] = hms(r["inicio_s"]), hms(r["fim_s"])
