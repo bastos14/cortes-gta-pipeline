@@ -35,6 +35,7 @@ edicao:                   # Fase 3 (layout 9:16: streamer em cima, jogo embaixo)
   largura: 1080
   altura: 1920
   topo_altura: 608        # px da área da câmera (câmera inteira 16:9 em 1080 px de largura); o resto é o jogo
+  censurar_palavroes: true  # legenda queimada esconde palavrão (C******); o áudio original não é alterado
   audio_atraso_s: 0       # ajuste fino de sincronia: + atrasa o áudio, - adianta
   whisper_modelo_legenda: medium
   legenda_palavras_por_bloco: 3

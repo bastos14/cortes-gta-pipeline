@@ -1,4 +1,12 @@
-# Frases de abertura manuais (opcional). Chave = segundo de início do corte no VOD (como em picos_final.json).
-# Sem entrada, o editor usa uma fala REAL do próprio streamer no trecho (nunca inventa fato; regra 8).
-# Exemplo:  "7421": "Ele não acreditou no que viu"
-{}
+# Frases de abertura (chave = segundo de início do corte no VOD, como em picos_final.json).
+# Regra: sempre uma fala REAL do trecho, sem palavrão e sem distorcer o fato (regra 8). Máx. 6 palavras.
+"3679": "Eu não vou morrer nenhuma vez"
+"4940": "Como é que faz a rádio?"
+"3923": "Que isso aí, não?"
+"4894": "Tem xixi por toda parte na rua"
+"4804": "Como é que buzina?"
+"3989": "Bora! Peguei!"
+"3763": "Não posso carregar o Marcelo"
+"5029": "Dirijo dando seta, pô"
+"5669": "Não é isso que ele ficou"
+"3840": "Quase que me viram aqui"

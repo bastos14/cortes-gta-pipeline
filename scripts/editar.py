@@ -11,6 +11,15 @@ def ass_t(t):
     t = max(t, 0); h, r = divmod(t, 3600); m, s = divmod(r, 60)
     return f"{int(h)}:{int(m):02d}:{s:05.2f}"
 
+PALAVROES = re.compile(r"^(carai\w*|porra\w*|fod\w*|fud\w*|put[ao]s?|buceta\w*|merda\w*|cacete\w*|cuz[aã]o|otário\w*)$", re.I)
+
+def censura(w):
+    """Esconde palavrão na legenda queimada (mantém a 1ª letra): 'caralho' -> 'C******'."""
+    s = re.sub(r"[^\wÀ-ÿ]", "", w)
+    if s and PALAVROES.match(s):
+        return w.replace(s, s[0] + "*" * (len(s) - 1))
+    return w
+
 def limpa(t):
     return re.sub(r"[{}\\]", "", t).strip()
 
@@ -71,7 +80,9 @@ Format: Layer,Start,End,Name,Style,MarginL,MarginR,MarginV,Effect,Text"""]
             y = top + (i - (len(linhas_f) - 1) / 2) * lh
             linhas.append(f"Dialogue: 1,{ass_t(0)},{fim},,Frase,0,0,0,,{{\\pos({cx},{y:.0f})}}{ln}")
     n = ed["legenda_palavras_por_bloco"]
-    pal = [{**p, "i": max(0.0, p["i"] + desloc), "f": max(0.0, p["f"] + desloc)} for s in segs for p in s["palavras"]]
+    cens = ed.get("censurar_palavroes", True)
+    pal = [{**p, "w": censura(p["w"]) if cens else p["w"], "i": max(0.0, p["i"] + desloc), "f": max(0.0, p["f"] + desloc)}
+           for s in segs for p in s["palavras"]]
     blocos, atual = [], []
     for p in pal:
         if atual and (len(atual) >= n or p["i"] - atual[-1]["f"] > 0.8):
