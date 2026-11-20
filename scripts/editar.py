@@ -11,7 +11,7 @@ def ass_t(t):
     t = max(t, 0); h, r = divmod(t, 3600); m, s = divmod(r, 60)
     return f"{int(h)}:{int(m):02d}:{s:05.2f}"
 
-PALAVROES = re.compile(r"^(carai\w*|porra\w*|fod\w*|fud\w*|put[ao]s?|buceta\w*|merda\w*|cacete\w*|cuz[aã]o|otário\w*)$", re.I)
+PALAVROES = re.compile(r"^(caralh\w*|porra\w*|fod\w*|fud\w*|put[ao]s?|buceta\w*|merda\w*|cacete\w*|cuz[aã]o)$", re.I)
 
 def censura(w):
     """Esconde palavrão na legenda queimada (mantém a 1ª letra): 'caralho' -> 'C******'."""
