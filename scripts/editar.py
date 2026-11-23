@@ -170,13 +170,14 @@ def renderiza(video, ass, saida, lay, ed, logo, inicio_s=0, max_s=None):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--picos", required=True, help="galeria/picos_final.json")
+    ap.add_argument("--picos", default="", help="galeria/picos_final.json")
     ap.add_argument("--aprovados", default="todos", help="ids separados por vírgula ou 'todos'")
     ap.add_argument("--vod", required=True); ap.add_argument("--streamer", default="allanstag")
     ap.add_argument("--saida", default="cortes"); ap.add_argument("--config", default="config.yaml")
     ap.add_argument("--altura-max", type=int, default=1080, help="altura máxima do vídeo baixado (teste: 480)")
     ap.add_argument("--atrasos", default="", help="calibração: lista de audio_atraso_s (ex: -0.2,0,0.2); gera 14 s de cada")
     ap.add_argument("--com-logo", action="store_true", help="força a logo própria (teste); sem isso vale config marca_dagua_propria.ativa")
+    ap.add_argument("--trechos", default="", help="alternativa à galeria: lista inicio-fim em segundos do VOD (ex: 11460-11495,21474-21509)")
     ap.add_argument("--streamers", default="streamers.yaml"); ap.add_argument("--titulos", default="titulos.yaml")
     a = ap.parse_args()
     cfg = yaml.safe_load(open(a.config, encoding="utf-8"))
@@ -188,7 +189,14 @@ def main():
     mp = cfg.get("marca_dagua_propria", {})
     if (mp.get("ativa") or a.com_logo) and os.path.exists(mp["arquivo"]):
         logo = mp["arquivo"]
-    picos = json.load(open(a.picos, encoding="utf-8"))["top"]
+    if a.trechos.strip():
+        picos = []
+        for k, par_ in enumerate(a.trechos.split(","), 1):
+            i0, f0 = (float(x) for x in par_.split("-"))
+            picos.append({"id": k, "inicio_s": i0, "fim_s": f0, "duracao_s": f0 - i0, "inicio_hms": f"{int(i0)//3600:02d}:{int(i0)%3600//60:02d}:{int(i0)%60:02d}",
+                          "nota": None, "motivo": "trecho escolhido manualmente"})
+    else:
+        picos = json.load(open(a.picos, encoding="utf-8"))["top"]
     ids = None if a.aprovados.strip().lower() == "todos" else {int(x) for x in a.aprovados.split(",") if x.strip()}
     os.makedirs(a.saida, exist_ok=True); os.makedirs("tmp", exist_ok=True)
     manifesto = []

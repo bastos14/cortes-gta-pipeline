@@ -10,8 +10,14 @@ on:
         required: true
         type: string
       galeria_run:
-        description: "run_id da galeria (artefato galeria-<run_id>)"
-        required: true
+        description: "run_id da galeria (artefato galeria-<run_id>); ignorado se 'trechos' for preenchido"
+        required: false
+        default: "0"
+        type: string
+      trechos:
+        description: "Alternativa à galeria: trechos inicio-fim em segundos do VOD, separados por vírgula (ex: 11460-11495,21474-21509)"
+        required: false
+        default: ""
         type: string
       aprovados:
         description: "ids aprovados separados por vírgula, ou 'todos'"
@@ -58,6 +64,7 @@ jobs:
           read TS DUR < <(python3 -I scripts/vod_info.py info.json)
           python3 -I scripts/gate.py --id "$STREAMER" --vod-timestamp "$TS"
       - uses: actions/download-artifact@v4
+        if: ${{ inputs.trechos == '' }}
         with:
           name: galeria-${{ inputs.galeria_run }}
           path: galeria
@@ -67,10 +74,14 @@ jobs:
         id: m
         env:
           APROVADOS: ${{ inputs.aprovados }}
+          TRECHOS: ${{ inputs.trechos }}
         run: |
           python3 -I - <<'PY' >> "$GITHUB_OUTPUT"
           import json, os
-          ids = [p["id"] for p in json.load(open("galeria/picos_final.json", encoding="utf-8"))["top"]]
+          if os.environ["TRECHOS"].strip():
+              ids = list(range(1, len(os.environ["TRECHOS"].split(",")) + 1))
+          else:
+              ids = [p["id"] for p in json.load(open("galeria/picos_final.json", encoding="utf-8"))["top"]]
           a = os.environ["APROVADOS"].strip().lower()
           if a != "todos":
               ok = {int(x) for x in a.split(",") if x.strip()}
@@ -100,6 +111,7 @@ jobs:
           path: ~/.cache/huggingface
           key: whisper-medium-v1
       - uses: actions/download-artifact@v4
+        if: ${{ inputs.trechos == '' }}
         with:
           name: galeria-${{ inputs.galeria_run }}
           path: galeria
@@ -113,14 +125,15 @@ jobs:
           ALTURA: ${{ inputs.altura_max }}
           ATRASOS: ${{ inputs.atrasos }}
           COM_LOGO: ${{ inputs.com_logo }}
+          TRECHOS: ${{ inputs.trechos }}
         run: |
           set -o pipefail
           python3 scripts/editar.py --picos galeria/picos_final.json --aprovados "$ID" \
-            --vod "$VOD_URL" --streamer "$STREAMER" --altura-max "$ALTURA" --atrasos="$ATRASOS" \
+            --vod "$VOD_URL" --streamer "$STREAMER" --altura-max "$ALTURA" --atrasos="$ATRASOS" --trechos="$TRECHOS" \
             $([ "$COM_LOGO" = "true" ] && echo --com-logo) --saida cortes | tee resumo.txt
           { echo "## Corte $ID"; echo '```'; grep -v '^==' resumo.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:
           name: corte-${{ matrix.id }}-${{ github.run_id }}
           path: cortes
-          retention-days: 7
+          retention-days: 14
