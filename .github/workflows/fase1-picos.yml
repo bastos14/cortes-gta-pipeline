@@ -103,7 +103,7 @@ jobs:
           if [[ "$VOD_URL" == *kick.com/* ]]; then
             SLUG=$(echo "$VOD_URL" | sed -E 's#.*kick.com/([^/]+)/.*#\1#')
             python3 scripts/chat_kick.py --slug "$SLUG" --vod-timestamp "$VOD_TS" --inicio "$INICIO" \
-              --duracao "$DURACAO" --out w/chat.json | grep -E '^chat(: ok| t_min)' || true
+              --duracao "$DURACAO" --out w/chat.json | grep -E '^chat(: ok| t_min| passo)' || true
           fi
       - name: Picos e prévias
         env:
