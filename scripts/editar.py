@@ -13,6 +13,14 @@ def ass_t(t):
 
 PALAVROES = re.compile(r"^(caralh\w*|porra\w*|fod\w*|fud\w*|put[ao]s?|buceta\w*|merda\w*|cacete\w*|cuz[aã]o)$", re.I)
 
+EN_STOP = set("the a an is are was were be been this that these those you your i me my we our they them he she it its and or but if so to of in on at for with from not no yes do does did have has had will would can could should what who why how when where there here just like get got go going come know think want need see look let join club illegal american library freely".split())
+
+def es_ingles(texto):
+    """Fala do jogo em inglês não vira legenda (regra 12: legendas só em português)."""
+    pal = [re.sub(r"[^a-z]", "", w.lower()) for w in texto.split()]
+    pal = [w for w in pal if w]
+    return len(pal) >= 3 and sum(w in EN_STOP for w in pal) / len(pal) >= 0.4
+
 def censura(w):
     """Esconde palavrão na legenda queimada (mantém a 1ª letra): 'caralho' -> 'C******'."""
     s = re.sub(r"[^\wÀ-ÿ]", "", w)
@@ -82,7 +90,7 @@ Format: Layer,Start,End,Name,Style,MarginL,MarginR,MarginV,Effect,Text"""]
     n = ed["legenda_palavras_por_bloco"]
     cens = ed.get("censurar_palavroes", True)
     pal = [{**p, "w": censura(p["w"]) if cens else p["w"], "i": max(0.0, p["i"] + desloc), "f": max(0.0, p["f"] + desloc)}
-           for s in segs for p in s["palavras"]]
+           for s in segs if not es_ingles(s["texto"]) for p in s["palavras"]]
     blocos, atual = [], []
     for p in pal:
         if atual and (len(atual) >= n or p["i"] - atual[-1]["f"] > 0.8):
