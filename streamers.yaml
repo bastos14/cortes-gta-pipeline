@@ -31,6 +31,6 @@ streamers:
     layout:
       # Webcam: até ~3h12 do VOD (11700 s; confirmado em prints: 3:12 ainda no topo, 4:04 já embaixo) fica no canto SUPERIOR direito; depois, no canto direito mais abaixo.
       camera_periodos:
-        - {ate_s: 11700, camera: {x: 0.761, y: 0.022, w: 0.226, h: 0.222}}
+        - {vod: "01a1ee39-7f60-75b9-83f6-02990a1a010a", ate_s: 11700, camera: {x: 0.761, y: 0.022, w: 0.226, h: 0.222}}
       camera: {x: 0.761, y: 0.388, w: 0.226, h: 0.224}   # padrão (depois de 3h10)
       jogo:   {x: 0.17,  y: 0.0,   h: 1.0}               # faixa central do jogo; a largura sai da proporção da área de baixo

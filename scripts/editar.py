@@ -132,8 +132,11 @@ def inicios(video):
 def par(v):
     return int(v) // 2 * 2
 
-def camera_do_trecho(lay, inicio_s):
+def camera_do_trecho(lay, inicio_s, vod=""):
+    """Períodos de câmera valem só para o VOD indicado em 'vod' (id no link). Sem 'vod', valem para todos."""
     for per in lay.get("camera_periodos") or []:
+        if per.get("vod") and per["vod"] not in (vod or ""):
+            continue
         if inicio_s < per["ate_s"]:
             return per["camera"]
     return lay["camera"]
@@ -148,11 +151,11 @@ def filtro_audio(ed):
         pre = f"atrim=start={-d:.3f},asetpts=PTS-STARTPTS,"
     return pre + "loudnorm=I=-16:TP=-1.5:LRA=11"
 
-def renderiza(video, ass, saida, lay, ed, logo, inicio_s=0, max_s=None):
+def renderiza(video, ass, saida, lay, ed, logo, inicio_s=0, max_s=None, vod=""):
     W, H, top = ed["largura"], ed["altura"], ed["topo_altura"]
     bot = H - top
     iw, ih, _ = sonda(video)
-    c = camera_do_trecho(lay, inicio_s); j = lay["jogo"]
+    c = camera_do_trecho(lay, inicio_s, vod); j = lay["jogo"]
     cw, ch = par(c["w"] * iw), par(c["h"] * ih)
     cx, cy = par(c["x"] * iw), par(c["y"] * ih)
     jh = par(j.get("h", 1.0) * ih); jw = min(par(jh * W / bot), iw)
@@ -229,14 +232,14 @@ def main():
                 ed2 = {**ed, "audio_atraso_s": d}
                 assd = f"tmp/{n}_{d:+.2f}.ass"
                 open(assd, "w", encoding="utf-8").write(gera_ass(cfg, ed2, segs, frase, dur, camp["marca_dagua_texto"], desloc=d, logo=bool(logo)))
-                renderiza(bruto, assd, f"{a.saida}/calibra_{n}_atraso{d:+.2f}.mp4", lay, ed2, logo, p["inicio_s"], max_s=14)
+                renderiza(bruto, assd, f"{a.saida}/calibra_{n}_atraso{d:+.2f}.mp4", lay, ed2, logo, p["inicio_s"], max_s=14, vod=a.vod)
             os.remove(bruto)
             continue
         ass = f"tmp/{n}.ass"
         open(ass, "w", encoding="utf-8").write(gera_ass(cfg, ed, segs, frase, dur, camp["marca_dagua_texto"],
                                                         desloc=float(ed.get("audio_atraso_s", 0) or 0), logo=bool(logo)))
         out = f"{a.saida}/corte_{n}.mp4"
-        renderiza(bruto, ass, out, lay, ed, logo, p["inicio_s"])
+        renderiza(bruto, ass, out, lay, ed, logo, p["inicio_s"], vod=a.vod)
         titulo = (frase[:1].upper() + frase[1:] if frase else "Momento da live") + " " + camp["hashtag_obrigatoria"]
         manifesto.append({"id": p["id"], "arquivo": out, "vod": a.vod, "inicio_s": p["inicio_s"], "fim_s": p["fim_s"],
                           "duracao_s": round(dur, 1), "frase": frase, "titulo": titulo, "nota": p.get("nota"),
