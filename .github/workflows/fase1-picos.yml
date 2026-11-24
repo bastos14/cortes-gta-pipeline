@@ -90,8 +90,9 @@ jobs:
         run: |
           mkdir -p w
           yt-dlp --no-playlist --quiet --progress --download-sections "*${INICIO}-$((INICIO+DURACAO))" \
-            -f "best[height<=360]/worst" --merge-output-format mp4 -o "w/video.%(ext)s" "$VOD_URL"
+            -f "b[height<=360]/b[height<=480]/b/bv*[height<=360]+ba/worst" --merge-output-format mp4 -o "w/video.%(ext)s" "$VOD_URL"
           ls -lh w
+          ffprobe -v error -show_entries stream=codec_type,codec_name,width,height -of csv=p=0 w/video.mp4 || true
       - name: Chat (melhor esforço)
         continue-on-error: true
         env:

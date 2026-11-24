@@ -11,8 +11,11 @@ SR = 16000
 # ---------- áudio ----------
 def le_audio(video, sr=SR):
     cmd = ["ffmpeg", "-v", "error", "-i", video, "-vn", "-ac", "1", "-ar", str(sr), "-f", "s16le", "-"]
-    raw = subprocess.run(cmd, capture_output=True, check=True).stdout
-    return np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
+    r = subprocess.run(cmd, capture_output=True)
+    if r.returncode != 0:
+        sys.stderr.write("AVISO: ffmpeg não leu áudio de " + video + ": " + r.stderr.decode("utf-8", "ignore")[-300:] + "\n")
+        return np.zeros(0, dtype=np.float32)
+    return np.frombuffer(r.stdout, dtype=np.int16).astype(np.float32) / 32768.0
 
 def serie_volume(x, sr=SR):
     """dBFS por segundo + 'estouro' = quanto acima da base local (mediana móvel de 2 min), em dB."""
@@ -200,6 +203,12 @@ def main():
     a = ap.parse_args()
     cfg = yaml.safe_load(open(a.config, encoding="utf-8"))["picos"]
     x = le_audio(a.video)
+    if len(x) == 0:
+        json.dump({"video": a.video, "offset_s": a.offset, "duracao_analisada_s": 0, "chat_usado": False,
+                   "mensagens_chat": 0, "segmentos_transcritos": 0, "top": [], "aviso": "sem áudio legível neste bloco"},
+                  open(a.saida, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+        print("0 picos; bloco sem áudio legível")
+        return
     dur = len(x) / SR
     _, estouro = serie_volume(x)
     if a.transcricao:
